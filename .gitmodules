@@ -1,3 +1,3 @@
 [submodule "frontend"]
-	path = frontend
+	path = common
 	url = https://github.com/redis-developer/redis-rag-chat-frontend
