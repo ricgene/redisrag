@@ -5,17 +5,29 @@ For our example, the default chat type is a conversation with an intelligent age
 swapping that out with whatever other RAG operation you want is as simple as updating the SystemPrompt and changing out the documents you
 store in your Redis Database.
 
-## Frontend
+## Running with docker compose
+
+There are several component parts of this demo, to run them all with docker-compose, just run:
+
+```sh
+OpenAIApiKey=<YOUR_OPENAI_API_KEY> docker compose up
+```
+
+## Running the individual parts separately
+
+You can also run each component part of this same separately
+
+### Frontend
 
 ```
-cd frontend
+cd common/frontend
 npm install
 npm start
 ```
 
-## Backend
+### Backend
 
-### Configuration
+#### Configuration
 
 change directory into the `backend/webapi` directory. Then run the following command: 
 
@@ -25,7 +37,7 @@ mv .env.sample .env
 
 And change the `OPENAI_API_KEY` to your Open AI API key
 
-### Running the python backend
+#### Running the backend
 
 To run the app, now just run:
 
@@ -35,7 +47,8 @@ poetry start run
 
 ## Adding Documents to your Redis Database
 
-To add documents to Redis, the backend must be started
+After the application is started, in order to make it useful you need to add documents to Redis. For this example we've provided
+a dataset of beers that you can upload to Redis, and then ask the bot for recommendations.
 
 ### Upload the Provided Data
 
