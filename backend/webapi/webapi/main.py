@@ -2,6 +2,7 @@ import datetime
 import os
 import uuid
 
+import requests
 import redis
 import semantic_kernel as sk
 import uvicorn
@@ -35,7 +36,7 @@ app.add_middleware(
 greeting = os.getenv("GREETING")
 api_key = os.getenv("OPENAI_API_KEY")
 redis_uri = os.getenv("REDIS_URI")
-
+kernel_memory_url = os.getenv("KERNEL_MEMORY_URL")
 
 redis_client = redis.from_url(redis_uri)
 redis_memory = RedisMemoryStore(redis_uri)
@@ -48,10 +49,32 @@ kernel.add_chat_service(service=oai_chat_service, service_id='completion')
 kernel.add_text_embedding_generation_service("ada", service=oai_text_embedding)
 kernel.register_memory_store(memory_store=redis_memory)
 plugins_dir = "skills"
-utility_functions = kernel.import_semantic_skill_from_directory(plugins_dir, "utility")
+utility_functions = kernel.import_semantic_plugin_from_directory(plugins_dir, "utility")
 
 ChatMessage.make_index(redis_client)
 
+def get_memories(question: str) -> str:
+    data = {
+        "index": "km-py",
+        "query": question,
+        "limit": 5
+    }
+
+    response = requests.post(f"{kernel_memory_url}/search", json=data)
+
+    if response.status_code == 200:
+        response_json = response.json()
+        memories = response_json.get('results',[])
+        res = ""
+        for memory in memories:
+            res += "memory:"
+            for partition in memory['partitions']:
+                res += partition['text']
+            res += '\n'
+        print(res)
+        return res
+
+    raise Exception(response.text)
 
 @app.get("/")
 def read_root():
@@ -108,7 +131,7 @@ async def get_summary(chat_id: str) -> str:
     return summary.result
 
 
-async def get_bot_message(question: str, memories:str, summary: str, chat_id: str) -> ChatMessage:
+async def get_bot_message(question: str, memories: str, summary: str, chat_id: str) -> ChatMessage:
     variables = ContextVariables(question, {"memories": memories, "summary": summary})
     chat_function = utility_functions["chat"]
     response = await chat_function.invoke_async(variables=variables)
@@ -121,20 +144,19 @@ async def get_bot_message(question: str, memories:str, summary: str, chat_id: st
         timestamp=int(datetime.datetime.now().timestamp()))
 
 
-async def get_memories(question: str) -> str:
-    memories = await kernel.memory.search_async("sk-memory", query=question, limit=5)
-    text = ""
-    for memory in memories:
-        text += memory.text
-        text += '\n'
-    return text
-
-
 @app.post("/documents/upload")
 async def upload_document(file: UploadFile = File(...)):
-    text = await extract_text_from_upload(file)
-    await kernel.memory.save_information_async("sk-memory", text=text, id=str(uuid.uuid4()))
-    return {"status": 200, "response_data": "OK"}
+    file_content = await file.read()
+
+    data = {
+        "index": "km-py",
+        "id": str(uuid.uuid4())
+    }
+    files = {'file': (file.filename, file_content, file.content_type)}
+
+    response = requests.post(f"{kernel_memory_url}/upload", files=files, data=data)
+    response.raise_for_status()
+    return {"status": response.status_code, "response_data": response.text}
 
 
 @app.post("/chat/{chat_id}")
@@ -150,7 +172,7 @@ async def chat(chat_id: str, ask: Ask):
 
     summary = await get_summary(chat_id)
     intent = await get_intent(summary, ask)
-    memories = await get_memories(intent)
+    memories = get_memories(intent)
     bot_response = await get_bot_message(question=ask.prompt, memories=memories, summary=summary, chat_id=chat_id)
 
     user_message.save(redis_client)

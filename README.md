@@ -17,7 +17,7 @@ npm start
 
 ### Configuration
 
-change directory into the `python/webapi` directory. Then run the following command: 
+change directory into the `backend/webapi` directory. Then run the following command: 
 
 ```sh
 mv .env.sample .env

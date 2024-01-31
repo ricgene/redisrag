@@ -15,10 +15,15 @@ pydantic = ">2"
 requests = "^2.31.0"
 python-multipart = "^0.0.6"
 pypdf2 = "^3.0.1"
+redis = "^5.0.1"
+python-ulid = "^1.0.3"
 
 [tool.poetry.scripts]
 start = "webapi.main:start"
 
+
+[tool.poetry.group.dev.dependencies]
+setuptools = "^69.0.3"
 
 [build-system]
 requires = ["poetry-core"]
