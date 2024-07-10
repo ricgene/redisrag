@@ -6,11 +6,11 @@ authors = ["slorello89 <steve.lorello@redis.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.10,<3.13"
 fastapi = "^0.109.0"
 uvicorn = "^0.26.0"
 python-dotenv = "^1.0.0"
-semantic-kernel = "^0.4.5.dev0"
+semantic-kernel = ">=1.1.1"
 pydantic = ">2"
 requests = "^2.31.0"
 python-multipart = "^0.0.6"

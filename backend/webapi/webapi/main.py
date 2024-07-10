@@ -8,14 +8,13 @@ import semantic_kernel as sk
 import uvicorn
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion, OpenAITextEmbedding
-from semantic_kernel.connectors.memory.redis import RedisMemoryStore
-from semantic_kernel.orchestration.context_variables import ContextVariables
+from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
+from semantic_kernel.functions import KernelArguments, KernelPlugin
+
 from ulid import ULID
 
 from webapi.constants import CHAT_MESSAGE_INDEX_NAME
 from webapi.models import AuthorRole, Ask, ChatMessage
-from webapi.text_extractor import extract_text_from_upload
 
 origins = [
     "http://localhost",
@@ -39,17 +38,14 @@ redis_uri = os.getenv("REDIS_URI")
 kernel_memory_url = os.getenv("KERNEL_MEMORY_URL")
 
 redis_client = redis.from_url(redis_uri)
-redis_memory = RedisMemoryStore(redis_uri)
 
-oai_text_embedding = OpenAITextEmbedding(ai_model_id='text-embedding-ada-002', api_key=api_key)
 oai_chat_service = OpenAIChatCompletion(ai_model_id="gpt-3.5-turbo", api_key=api_key)
 
 kernel = sk.Kernel()
-kernel.add_chat_service(service=oai_chat_service, service_id='completion')
-kernel.add_text_embedding_generation_service("ada", service=oai_text_embedding)
-kernel.register_memory_store(memory_store=redis_memory)
-plugins_dir = "skills"
-utility_functions = kernel.import_semantic_plugin_from_directory(plugins_dir, "utility")
+kernel.add_service(oai_chat_service)
+utility_plugin = KernelPlugin.from_directory("utility", "skills")
+kernel.add_plugin(utility_plugin)
+utility_functions = utility_plugin.functions
 
 ChatMessage.make_index(redis_client)
 
@@ -117,28 +113,28 @@ def formatted_message_history(chat_id: str) -> str:
 
 
 async def get_intent(summary: str, ask: Ask) -> str:
-    variables = ContextVariables(ask.prompt, {"summary":summary})
+    kernel_arguments = KernelArguments(input=ask.prompt, summary=summary)
     intent_function = utility_functions["intent"]
-    intent = await intent_function.invoke_async(variables=variables)
-    return intent.result
+    intent = await kernel.invoke(intent_function, kernel_arguments)
+    return str(intent)
 
 
 async def get_summary(chat_id: str) -> str:
     history = formatted_message_history(chat_id)
-    variables = ContextVariables(history)
+    kernel_arguments = KernelArguments(input=history)
     summarize_function = utility_functions["summarize"]
-    summary = await summarize_function.invoke_async(variables=variables)
-    return summary.result
+    summary = await kernel.invoke(summarize_function, kernel_arguments)
+    return str(summary)
 
 
 async def get_bot_message(question: str, memories: str, summary: str, chat_id: str) -> ChatMessage:
-    variables = ContextVariables(question, {"memories": memories, "summary": summary})
+    kernel_arguments = KernelArguments(input=question, memories=memories, summary=summary)
     chat_function = utility_functions["chat"]
-    response = await chat_function.invoke_async(variables=variables)
+    response = await kernel.invoke(chat_function, kernel_arguments)
 
     return ChatMessage(
         pk=uuid.uuid4(),
-        message=response.result,
+        message=str(response),
         chatId=chat_id,
         author_role=AuthorRole.Bot,
         timestamp=int(datetime.datetime.now().timestamp()))
