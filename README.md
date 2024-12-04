@@ -1,5 +1,6 @@
 # Redis Rag Chat
 
+
 Redis Rag Chat is a simple Chat application demonstrating how to use the RAG pattern with various frameworks using Redis as your Vector Database.
 For our example, the default chat type is a conversation with an intelligent agent that can recommend different beers to you, however
 swapping that out with whatever other RAG operation you want is as simple as updating the SystemPrompt and changing out the documents you
